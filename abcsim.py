@@ -5,13 +5,14 @@ from matplotlib.pyplot import plot, figure, show, xlabel, ylabel
 # https://medium.com/giveth/deep-dive-augmented-bonding-curves-3f1f7c1fa751
 
 # Parameters
-t = np.linspace(0, 4 * 52, 1000)  # (weeks) time
-i = 1  # annual growth rate of the platform
-F0 = 10000  # (EUR) amount of funding allocated in the first week of the platform
-d0 = 200000  # (EUR) initial raise
+N = 4 * 52 + 1  # number of weeks
+t = np.linspace(0, N - 1, N)  # (weeks) time
+i = 0.5  # annual growth rate of the platform
+F0 = 10000  # (EUR) amount of funding allocated in the first week of the platform (week 0)
+d0 = 100000  # (EUR) initial raise
 theta = 0.5  # initial allocation to funding pool
 p0 = 0.1  # (DAI) initial price per token
-p1 = 0.25  # (DAI) post-hatch price per token
+p1 = 0.3  # (DAI) post-hatch price per token
 rF = 0.05  # (-) percentage fee when funding projects
 rS = 0.05  # (-) percentage fee when selling tokens
 rT = 0.1  # (-) percentage of funding that is used to create tokens for the donor
@@ -30,20 +31,19 @@ d = theta * d0 + np.cumsum(F * rF)  # (EUR) size of Refaqt's funding pool
 
 # Simulation
 Fp = np.cumsum(F * (1 - rF) * (1 - rT))  # Total amount of funding to projects
-S_m = np.zeros((len(F), len(F)))  # Number of tokens, split up per week
-DeltaS = np.zeros((len(F), len(F)))  # Change of the supply each week
-R_m = np.zeros((len(F), len(F)))  # Part of the reserve attributed to the tokens minted each week
-DeltaR = np.zeros((len(F), len(F)))  # Change of the reserve each week
-S = np.zeros(len(F))
+S_m = np.zeros((N, N))  # Number of tokens, split up per week
+DeltaS = np.zeros((N, N))  # Change of the supply each week
+R_m = np.zeros((N, N))  # Part of the reserve attributed to the tokens minted each week
+DeltaR = np.zeros((N, N))  # Change of the reserve each week
+S = np.zeros(N)
 S[0] = S0
-R = np.zeros(len(F))
+R = np.zeros(N)
 R[0] = R0
-P = np.zeros(len(F))
+P = np.zeros(N)
 P[0] = p1
 j = 0
 
-
-for i in range(1, len(F)):
+for i in range(1, N):
     DeltaR[i, i] = F[i-1] * (1 - rF) * rT
     # Insert change in reserve from burning of tokens here
     R[i] = R[i-1] + np.sum(DeltaR[i, :])
@@ -51,6 +51,8 @@ for i in range(1, len(F)):
     S[i] = S[i-1] + np.sum(DeltaS[i, i])
     P[i] = kappa * R[i] ** ((kappa - 1) / kappa) / V0 ** (1 / kappa)
 
+pROI = [F[i] / DeltaS[i, i] for i in range(1, N)]  # (EUR) token price at which donations in this week would be earned back
+mROI = pROI / P[1:]  # (-) required multiple to reach ROI
 
 figure("Weekly amount of funding")
 plot(t, F)
@@ -77,6 +79,11 @@ plot(t, [DeltaS[i, i] for i in range(len(F))])
 xlabel("time (weeks)")
 ylabel("\Delta S (-)")
 
+figure("DeltaR")
+plot(t, [DeltaR[i, i] for i in range(len(F))])
+xlabel("time (weeks)")
+ylabel("\Delta R (-)")
+
 figure("Reserve / weekly")
 plot(t, R)
 xlabel("time (weeks)")
@@ -87,25 +94,35 @@ plot(t, S)
 xlabel("time (weeks)")
 ylabel("Supply (-)")
 
+figure("Cumulative funding to projects")
+plot(t, Fp)
+xlabel("time (weeks)")
+ylabel("Funding (EUR)")
+
 figure("Token price / weekly")
 plot(t, P)
 xlabel("time (weeks)")
 ylabel("Token price (EUR)")
 
-figure("Total funding to projects")
-plot(t, Fp)
+figure("Price at which there will be ROI")
+plot(t[1:], pROI)
 xlabel("time (weeks)")
-ylabel("Funding (EUR)")
+ylabel("pROI (EUR)")
+
+figure("Multiple required to reach ROI")
+plot(t[1:], mROI)
+xlabel("time (weeks)")
+ylabel("mROI (-)")
 
 # figure("Reserve / Supply")
 # plot(Slin, Rlin)
 # xlabel("Token supply (number of tokens)")
 # ylabel("Reserve (EUR)")
 #
-# figure("Supply / Reserve")
-# plot(Rlin, Slin)
-# xlabel("Reserve (EUR)")
-# ylabel("Token supply (number of tokens)")
+figure("Supply / Reserve")
+plot(Rlin, Slin)
+xlabel("Reserve (EUR)")
+ylabel("Token supply (number of tokens)")
 #
 # figure("Reserve / Token price")
 # plot(Rlin, PSlin)
